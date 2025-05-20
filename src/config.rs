@@ -1,3 +1,4 @@
+use crate::theme::{TOKYO_NIGHT, Theme, ThemePalette};
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 use serde_inline_default::serde_inline_default;
@@ -16,6 +17,9 @@ pub enum ViewType {
 pub struct Config {
   #[serde_inline_default(ViewType::Sparkline)]
   pub view_type: ViewType,
+
+  #[serde_inline_default(Theme::Default)]
+  pub theme: Theme,
 
   #[serde_inline_default(COLORS_OPTIONS[0])]
   pub color: Color,
@@ -68,12 +72,41 @@ impl Config {
     }
   }
 
-  pub fn next_color(&mut self) {
-    self.color = match COLORS_OPTIONS.iter().position(|&c| c == self.color) {
-      Some(idx) => COLORS_OPTIONS[(idx + 1) % COLORS_OPTIONS.len()],
-      None => COLORS_OPTIONS[0],
-    };
+  pub fn next_theme(&mut self) {
+    match self.theme {
+      Theme::Default => {
+        if let Some(idx) = COLORS_OPTIONS.iter().position(|&c| c == self.color) {
+          if idx + 1 < COLORS_OPTIONS.len() {
+            self.color = COLORS_OPTIONS[idx + 1];
+          } else {
+            self.theme = Theme::TokyoNight;
+          }
+        } else {
+          self.color = COLORS_OPTIONS[0];
+        }
+      }
+      Theme::TokyoNight => {
+        self.theme = Theme::Default;
+        self.color = COLORS_OPTIONS[0];
+      }
+    }
     self.save();
+  }
+
+  pub fn palette(&self) -> ThemePalette {
+    match self.theme {
+      Theme::Default => ThemePalette {
+        border: self.color,
+        text: Color::Reset,
+        start: self.color,
+        mid: self.color,
+        end: self.color,
+        start256: self.color,
+        mid256: self.color,
+        end256: self.color,
+      },
+      Theme::TokyoNight => TOKYO_NIGHT,
+    }
   }
 
   pub fn next_view_type(&mut self) {

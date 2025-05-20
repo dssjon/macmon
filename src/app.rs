@@ -11,6 +11,7 @@ use ratatui::{prelude::*, widgets::*};
 
 use crate::config::{Config, ViewType};
 use crate::metrics::{Metrics, Sampler, zero_div};
+use crate::theme::Theme;
 use crate::{metrics::MemMetrics, sources::SocInfo};
 
 type WithError<T> = Result<T, Box<dyn std::error::Error>>;
@@ -250,6 +251,11 @@ impl App {
     Ok(Self { cfg, soc, ..Default::default() })
   }
 
+  pub fn set_theme(&mut self, theme: Theme) {
+    self.cfg.theme = theme;
+    self.cfg.save();
+  }
+
   fn update_metrics(&mut self, data: Metrics) {
     self.cpu_power.push(data.cpu_power as f64);
     self.gpu_power.push(data.gpu_power as f64);
@@ -267,10 +273,11 @@ impl App {
   }
 
   fn title_block<'a>(&self, label_l: &str, label_r: &str) -> Block<'a> {
+    let palette = self.cfg.palette();
     let mut block = Block::new()
       .borders(Borders::ALL)
       .border_type(BorderType::Rounded)
-      .border_style(self.cfg.color)
+      .border_style(palette.border)
       // .title_style(Style::default().gray())
       .padding(Padding::ZERO);
 
@@ -298,17 +305,19 @@ impl App {
 
     let label_r = if temp > 0.0 { format!("{:.1}°C", temp) } else { "".to_string() };
 
+    let palette = self.cfg.palette();
     Sparkline::default()
       .block(self.title_block(label_l.as_str(), label_r.as_str()))
       .direction(RenderDirection::RightToLeft)
       .data(&val.items)
-      .style(self.cfg.color)
+      .style(palette.start_color())
   }
 
   fn render_freq_block(&self, f: &mut Frame, r: Rect, label: &str, val: &FreqStore) {
     let label = format!("{} {:3.0}% @ {:4.0} MHz", label, val.usage * 100.0, val.top_value);
     let block = self.title_block(label.as_str(), "");
 
+    let palette = self.cfg.palette();
     match self.cfg.view_type {
       ViewType::Sparkline => {
         let w = Sparkline::default()
@@ -316,17 +325,26 @@ impl App {
           .direction(RenderDirection::RightToLeft)
           .data(&val.items)
           .max(100)
-          .style(self.cfg.color);
+          .style(palette.start_color());
         f.render_widget(w, r);
       }
       ViewType::Gauge => {
-        let w = Gauge::default()
-          .block(block)
-          .gauge_style(self.cfg.color)
-          .style(self.cfg.color)
-          .label("")
-          .ratio(val.usage);
-        f.render_widget(w, r);
+        if let crate::theme::Theme::TokyoNight = self.cfg.theme {
+          let w = crate::gradient_gauge::GradientGauge::default()
+            .block(block)
+            .style(Color::Reset)
+            .ratio(val.usage)
+            .colors(palette.start_color(), palette.mid_color(), palette.end_color());
+          f.render_widget(w, r);
+        } else {
+          let w = Gauge::default()
+            .block(block)
+            .gauge_style(palette.start_color())
+            .style(palette.start_color())
+            .label("")
+            .ratio(val.usage);
+          f.render_widget(w, r);
+        }
       }
     }
   }
@@ -342,6 +360,7 @@ impl App {
     let label_r = format!("SWAP {:.2} / {:.1} GB", swap_usage_gb, swap_total_gb);
 
     let block = self.title_block(label_l.as_str(), label_r.as_str());
+    let palette = self.cfg.palette();
     match self.cfg.view_type {
       ViewType::Sparkline => {
         let w = Sparkline::default()
@@ -349,17 +368,26 @@ impl App {
           .direction(RenderDirection::RightToLeft)
           .data(&val.items)
           .max(val.ram_total)
-          .style(self.cfg.color);
+          .style(palette.start_color());
         f.render_widget(w, r);
       }
       ViewType::Gauge => {
-        let w = Gauge::default()
-          .block(block)
-          .gauge_style(self.cfg.color)
-          .style(self.cfg.color)
-          .label("")
-          .ratio(zero_div(ram_usage_gb, ram_total_gb));
-        f.render_widget(w, r);
+        if let crate::theme::Theme::TokyoNight = self.cfg.theme {
+          let w = crate::gradient_gauge::GradientGauge::default()
+            .block(block)
+            .style(Color::Reset)
+            .ratio(zero_div(ram_usage_gb, ram_total_gb))
+            .colors(palette.start_color(), palette.mid_color(), palette.end_color());
+          f.render_widget(w, r);
+        } else {
+          let w = Gauge::default()
+            .block(block)
+            .gauge_style(palette.start_color())
+            .style(palette.start_color())
+            .label("")
+            .ratio(zero_div(ram_usage_gb, ram_total_gb));
+          f.render_widget(w, r);
+        }
       }
     }
   }
@@ -416,7 +444,7 @@ impl App {
     };
 
     let block = self.title_block(&label_l, &label_r);
-    let usage = format!(" 'q' – quit, 'c' – color, 'v' – view | -/+ {}ms ", self.cfg.interval);
+    let usage = format!(" 'q' – quit, 'c' – theme, 'v' – view | -/+ {}ms ", self.cfg.interval);
     let block = block.title_bottom(Line::from(usage).right_aligned());
     let iarea = block.inner(rows[1]);
     f.render_widget(block, rows[1]);
@@ -448,7 +476,7 @@ impl App {
       match rx.recv()? {
         Event::Quit => break,
         Event::Update(data) => self.update_metrics(data),
-        Event::ChangeColor => self.cfg.next_color(),
+        Event::ChangeColor => self.cfg.next_theme(),
         Event::ChangeView => self.cfg.next_view_type(),
         Event::IncInterval => {
           self.cfg.inc_interval();

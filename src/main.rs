@@ -1,9 +1,12 @@
 mod app;
 mod config;
 mod debug;
+mod gradient_gauge;
 mod metrics;
 mod sources;
+mod theme;
 
+use crate::theme::Theme;
 use app::App;
 use clap::{CommandFactory, Parser, Subcommand, parser::ValueSource};
 use metrics::Sampler;
@@ -34,6 +37,10 @@ struct Cli {
   /// Update interval in milliseconds
   #[arg(short, long, global = true, default_value_t = 1000)]
   interval: u32,
+
+  /// Theme to use (default or tokyo-night)
+  #[arg(long, value_enum)]
+  theme: Option<Theme>,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -68,6 +75,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         Some(ValueSource::CommandLine) => Some(args.interval),
         _ => None,
       };
+
+      if let Some(ValueSource::CommandLine) = matches.value_source("theme") {
+        app.set_theme(args.theme.unwrap_or(Theme::Default));
+      }
 
       app.run_loop(msec)?;
     }

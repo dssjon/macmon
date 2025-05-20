@@ -27,7 +27,7 @@ Apple Silicon processors don't provide an easy way to see live power consumption
 - 💾 RAM / Swap usage
 - 📈 Historical charts + avg / max values
 - 🌡️ Average CPU / GPU temperature
-- 🎨 Switchable colors (6 variants)
+- 🎨 Switchable colors (6 variants) plus Tokyo Night theme
 - 🪟 Can be rendered in a small window
 - 🦀 Written in Rust
 
@@ -81,11 +81,12 @@ Commands:
 
 Options:
   -i, --interval <INTERVAL>  Update interval in milliseconds [default: 1000]
+  --theme <THEME>           Set theme (default or tokyo-night)
   -h, --help                 Print help
   -V, --version              Print version
 
 Controls:
-  c - change color
+  c - change theme
   v - switch charts view: gauge / sparkline
   q - quit
 ```
